@@ -1,8 +1,8 @@
 {
-	"id": "quick-tweet",
-	"name": "Quick Tweet",
+	"id": "gemini-assistant",
+	"name": "Gemini Assistant",
 	"version": "1.0.0",
-	"description": "Download tweets.",
+	"description": "Uses Gemini API.",
 	"author": "Wapply",
 	"authorUrl": "https://github.com/Wapply",
 	"fundingUrl": {
