@@ -1,7 +1,7 @@
 {
-	"name": "quick-tweet",
+	"name": "gemini-assistant",
 	"version": "1.0.0",
-	"description": "Download tweets.",
+	"description": "Uses Gemini API.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
