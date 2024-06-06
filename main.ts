@@ -1,79 +1,233 @@
-import { App, Notice, Plugin, Editor, MarkdownView, PluginSettingTab, Setting } from 'obsidian';
+import { App, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
 
-interface ObsidianGeminiAssistantSettings {
-  apiKey: string;
-  // ... otras opciones de configuración en el futuro
+interface HealthPluginSettings {
+  mySetting: string;
 }
 
-const DEFAULT_SETTINGS: ObsidianGeminiAssistantSettings = {
-  apiKey: '', 
-};
+const DEFAULT_SETTINGS: HealthPluginSettings = {
+  mySetting: 'default'
+}
 
-export default class ObsidianGeminiAssistantPlugin extends Plugin {
-  settings: ObsidianGeminiAssistantSettings;
+class HealthTrackerModal extends Modal {
+  plugin: HealthPlugin;
+
+  constructor(app: App, plugin: HealthPlugin) {
+    super(app);
+    this.plugin = plugin;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.setText('Track your activity here.');
+
+    // Form to input activity data
+    const form = contentEl.createEl('form');
+
+    form.createEl('h3', { text: 'Register Physical Activity' });
+
+    form.createEl('label', { text: 'Type of Exercise' });
+    const exerciseType = form.createEl('input', { type: 'text' });
+
+    form.createEl('label', { text: 'Duration (minutes)' });
+    const duration = form.createEl('input', { type: 'number' });
+
+    form.createEl('label', { text: 'Intensity' });
+    const intensity = form.createEl('select');
+    ['Low', 'Medium', 'High'].forEach(level => {
+      intensity.createEl('option', { text: level, value: level });
+    });
+
+    form.createEl('label', { text: 'Calories Burned' });
+    const calories = form.createEl('input', { type: 'number' });
+
+    const submitButton = form.createEl('button', { text: 'Save' });
+    submitButton.type = 'submit';
+
+    form.onsubmit = async (event) => {
+      event.preventDefault();
+
+      const data = {
+        type: exerciseType.value,
+        duration: duration.value,
+        intensity: intensity.value,
+        calories: calories.value
+      };
+
+      this.plugin.saveActivityData(data);
+      new Notice('Activity Saved!');
+
+      this.close();
+    };
+  }
+
+  onClose() {
+    const { contentEl } = this;
+    contentEl.empty();
+  }
+}
+
+class SleepTrackerModal extends Modal {
+  plugin: HealthPlugin;
+
+  constructor(app: App, plugin: HealthPlugin) {
+    super(app);
+    this.plugin = plugin;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.setText('Track your sleep here.');
+
+    // Form to input sleep data
+    const form = contentEl.createEl('form');
+
+    form.createEl('h3', { text: 'Register Sleep' });
+
+    form.createEl('label', { text: 'Hours Slept' });
+    const hoursSlept = form.createEl('input', { type: 'number' });
+
+    form.createEl('label', { text: 'Quality of Sleep' });
+    const quality = form.createEl('select');
+    ['Poor', 'Fair', 'Good', 'Excellent'].forEach(level => {
+      quality.createEl('option', { text: level, value: level });
+    });
+
+    const submitButton = form.createEl('button', { text: 'Save' });
+    submitButton.type = 'submit';
+
+    form.onsubmit = async (event) => {
+      event.preventDefault();
+
+      const data = {
+        hours: hoursSlept.value,
+        quality: quality.value
+      };
+
+      this.plugin.saveSleepData(data);
+      new Notice('Sleep Data Saved!');
+
+      this.close();
+    };
+  }
+
+  onClose() {
+    const { contentEl } = this;
+    contentEl.empty();
+  }
+}
+
+class NutritionTrackerModal extends Modal {
+  plugin: HealthPlugin;
+
+  constructor(app: App, plugin: HealthPlugin) {
+    super(app);
+    this.plugin = plugin;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.setText('Track your nutrition here.');
+
+    // Form to input nutrition data
+    const form = contentEl.createEl('form');
+
+    form.createEl('h3', { text: 'Register Nutrition' });
+
+    form.createEl('label', { text: 'Food' });
+    const food = form.createEl('input', { type: 'text' });
+
+    form.createEl('label', { text: 'Calories' });
+    const calories = form.createEl('input', { type: 'number' });
+
+    form.createEl('label', { text: 'Macros (Carbs, Protein, Fat)' });
+    const macros = form.createEl('input', { type: 'text' });
+
+    const submitButton = form.createEl('button', { text: 'Save' });
+    submitButton.type = 'submit';
+
+    form.onsubmit = async (event) => {
+      event.preventDefault();
+
+      const data = {
+        food: food.value,
+        calories: calories.value,
+        macros: macros.value
+      };
+
+      this.plugin.saveNutritionData(data);
+      new Notice('Nutrition Data Saved!');
+
+      this.close();
+    };
+  }
+
+  onClose() {
+    const { contentEl } = this;
+    contentEl.empty();
+  }
+}
+
+class HealthSettingTab extends PluginSettingTab {
+  plugin: HealthPlugin;
+
+  constructor(app: App, plugin: HealthPlugin) {
+    super(app, plugin);
+    this.plugin = plugin;
+  }
+
+  display(): void {
+    const { containerEl } = this;
+
+    containerEl.empty();
+    
+    containerEl.createEl('h2', { text: 'Settings for Health Plugin' });
+
+    new Setting(containerEl)
+      .setName('Sample Setting')
+      .setDesc('A sample setting for the plugin.')
+      .addText(text => text
+        .setPlaceholder('Enter your setting')
+        .setValue(this.plugin.settings.mySetting)
+        .onChange(async (value) => {
+          this.plugin.settings.mySetting = value;
+          await this.plugin.saveSettings();
+        }));
+  }
+}
+
+export default class HealthPlugin extends Plugin {
+  settings: HealthPluginSettings;
 
   async onload() {
     await this.loadSettings();
 
-    this.addCommand({
-      id: 'gemini-generate',
-      name: 'Gemini: Generar texto',
-      editorCallback: (editor: Editor, view: MarkdownView) => {
-        const selectedText = editor.getSelection();
-        if (!selectedText) {
-          new Notice('Selecciona un texto primero.');
-          return;
-        }
-        this.generateWithGemini(selectedText, editor);
-      },
+    this.addRibbonIcon('heart', 'Open Health Tracker', () => {
+      new HealthTrackerModal(this.app, this).open();
     });
 
-    this.addSettingTab(new ObsidianGeminiAssistantSettingTab(this.app, this));
+    this.addCommand({
+      id: 'open-sleep-tracker',
+      name: 'Open Sleep Tracker',
+      callback: () => {
+        new SleepTrackerModal(this.app, this).open();
+      }
+    });
+
+    this.addCommand({
+      id: 'open-nutrition-tracker',
+      name: 'Open Nutrition Tracker',
+      callback: () => {
+        new NutritionTrackerModal(this.app, this).open();
+      }
+    });
+
+    this.addSettingTab(new HealthSettingTab(this.app, this));
+
+    this.registerCommands();
   }
 
-  onunload() {}
-
-  async generateWithGemini(text: string, editor: Editor) {
-    const context = this.getContext(editor); 
-
-    try {
-      // Simula una respuesta de una API de Gemini (reemplazar con la lógica real)
-      const simulatedResponse = {
-        generated_text: `## Respuesta de Gemini (simulada)\n\nBasado en el texto: "${text}"\n\nY en el contexto: "${context}"`,
-      };
-
-      const generatedText = simulatedResponse.generated_text; 
-      editor.replaceSelection(generatedText); 
-
-    } catch (error) {
-      new Notice(`Error al generar texto con Gemini: ${error.message}`);
-    }
-  }
-
-  getContext(editor: Editor): string {
-    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-    if (!view) return ''; // Asegurarse de que estamos en una vista de Markdown
-
-    const file = view.file;
-    if (!file) return '';
-
-    const cache = this.app.metadataCache.getFileCache(file);
-    if (!cache) return '';
-
-    // Obtener el título
-    let context = `Título de la nota: "${cache.frontmatter?.title || file.basename}"`; 
-
-    // Agregar etiquetas, si existen
-    if (cache.frontmatter?.tags) {
-      context += `, Etiquetas: "${cache.frontmatter.tags.join(', ')}"`;
-    }
-
-    // Ejemplo: agregar el párrafo actual al contexto
-    const lineNumber = editor.getCursor().line;
-    const paragraph = editor.getLine(lineNumber);
-    context += `, Párrafo actual: "${paragraph}"`;
-
-    return context;
+  onunload() {
+    console.log('Unloading Health Tracker Plugin');
   }
 
   async loadSettings() {
@@ -83,34 +237,65 @@ export default class ObsidianGeminiAssistantPlugin extends Plugin {
   async saveSettings() {
     await this.saveData(this.settings);
   }
-}
 
-// Clase para la pestaña de configuración
-class ObsidianGeminiAssistantSettingTab extends PluginSettingTab {
-    plugin: ObsidianGeminiAssistantPlugin;
-  
-    constructor(app: App, plugin: ObsidianGeminiAssistantPlugin) {
-      super(app, plugin);
-      this.plugin = plugin;
-    }
-  
-    display(): void {
-      const {containerEl} = this;
-      containerEl.empty();
-  
-      containerEl.createEl('h2', {text: 'Configuración de Obsidian Gemini Assistant'});
-  
-      new Setting(containerEl)
-        .setName('API Token de Gemini')
-        .setDesc('Ingresa tu clave de API para acceder a Gemini.')
-        .addText((text) => 
-          text
-            .setPlaceholder('Ingresa tu API Token aquí')
-            .setValue(this.plugin.settings.apiKey)
-            .onChange(async (value) => {
-              this.plugin.settings.apiKey = value;
-              await this.plugin.saveSettings();
-            })
-        );
+  registerCommands() {
+    this.addCommand({
+      id: 'insert-activity-note',
+      name: 'Insert Activity Note',
+      editorCallback: (editor, view) => {
+        const activityNote = `## Activity Log
+- **Type**: 
+- **Duration**: 
+- **Intensity**: 
+- **Calories Burned**: `;
+        editor.replaceRange(activityNote, editor.getCursor());
+      }
+    });
+
+    this.addCommand({
+      id: 'insert-sleep-note',
+      name: 'Insert Sleep Note',
+      editorCallback: (editor, view) => {
+        const sleepNote = `## Sleep Log
+- **Hours Slept**: 
+- **Quality of Sleep**: `;
+        editor.replaceRange(sleepNote, editor.getCursor());
+      }
+    });
+
+    this.addCommand({
+      id: 'insert-nutrition-note',
+      name: 'Insert Nutrition Note',
+      editorCallback: (editor, view) => {
+        const nutritionNote = `## Nutrition Log
+- **Food**: 
+- **Calories**: 
+- **Macros (Carbs, Protein, Fat)**: `;
+        editor.replaceRange(nutritionNote, editor.getCursor());
+      }
+    });
+  }
+
+  saveActivityData(data: any) {
+    this.saveDataToFile('activity-log.md', data);
+  }
+
+  saveSleepData(data: any) {
+    this.saveDataToFile('sleep-log.md', data);
+  }
+
+  saveNutritionData(data: any) {
+    this.saveDataToFile('nutrition-log.md', data);
+  }
+
+  async saveDataToFile(filename: string, data: any) {
+    const file = this.app.vault.getAbstractFileByPath(filename) as TFile;
+    if (file) {
+      const content = await this.app.vault.read(file);
+      const updatedContent = content + `\n${JSON.stringify(data)}`;
+      await this.app.vault.modify(file, updatedContent);
+    } else {
+      await this.app.vault.create(filename, JSON.stringify(data));
     }
   }
+}

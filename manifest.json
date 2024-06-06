@@ -1,8 +1,8 @@
 {
-	"id": "gemini-assistant",
-	"name": "Gemini Assistant",
+	"id": "health",
+	"name": "Health Tracker",
 	"version": "1.0.0",
-	"description": "Uses Gemini API.",
+	"description": "Plugin to track health activities, sleep, and nutrition.",
 	"author": "Wapply",
 	"authorUrl": "https://github.com/Wapply",
 	"fundingUrl": {
